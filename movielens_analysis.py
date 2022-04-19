@@ -642,4 +642,4 @@ if __name__ == '__main__':
 	#print(Tests().test_rating_dist_by_year)
 	#print(Tags('ml-latest-small/tags.csv').is_valid_file())
 	#print(CsvParser(sys.argv[1]).read_csv())
-	print(Links('ml-latest-small/links.csv').get_imdb(['1', '2', '3', '4', '5'], ['director', 'name', 'genre', 'actor', 'runtime']))
+	#print(Links('ml-latest-small/links.csv').get_imdb(['1', '2', '3', '4', '5'], ['director', 'name', 'genre', 'actor', 'runtime']))
