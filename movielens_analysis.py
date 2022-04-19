@@ -302,223 +302,287 @@ class Ratings(CsvParser):
 			return super().top_controversial(n)
 
 
-class Tags(CsvParser):
-	"""
-	Analyzing data from tags.csv
-	"""
-
-	def __init__(self, path_to_the_file):
-		"""
-		Put here any fields that you think you will need.
-		"""
-		super().__init__(path_to_the_file)
-
-	def is_valid_file(self):
-		return set(self.columns) == set('userId,movieId,tag,timestamp'.split(','))
-
-	def read_csv(self):
-		for tags in super(Tags, self).read_csv():
-			if not self.is_valid_file():
-				print(f'Invalid parse CSV {self.filename}')
-				sys.exit()
-			tags['tag'] = tags['tag'].lower()
-			yield tags
-
-	def most_words(self, n):
-		"""
-		The method returns top-n tags with most words inside. It is a dict
-		where the keys are tags and the values are the number of words inside the tag.
-		Drop the duplicates. Sort it by numbers descendingly.
-		"""
-		big_tags = Counter()
-		for tags in self.read_csv():
-			tags_list = self.get_tags(tags)
-			big_tags[" ".join(tags_list)] = len(tags_list)
-		return dict(big_tags.most_common(n))
-
-	def longest(self, n):
-		"""
-		The method returns top-n longest tags in terms of the number of characters.
-		It is a list of the tags. Drop the duplicates. Sort it by numbers descendingly.
-		"""
-		big_tags = Counter()
-		for tags in self.read_csv():
-			for tag_list in self.get_tags(tags):
-				big_tags[tag_list] = len(tag_list)
-		return list(dict(big_tags.most_common(n)).keys())
-
-	def most_words_and_longest(self, n):
-		"""
-		The method returns the intersection between top-n tags with most words inside and
-		top-n longest tags in terms of the number of characters.
-		Drop the duplicates. It is a list of the tags.
-		"""
-		big_tags = list(set(self.most_words(n)) & set(self.longest(n)))
-		return big_tags
-
-	def most_popular(self, n):
-		"""
-		The method returns the most popular tags.
-		It is a dict where the keys are tags and the values are the counts.
-		Drop the duplicates. Sort it by counts descendingly.
-		"""
-		big_tags = Counter()
-		for tags in self.read_csv():
-			for tag_list in self.get_tags(tags):
-				big_tags[tag_list] += 1
-		return dict(big_tags.most_common(n))
-
-	def tags_with(self, word):
-		"""
-		The method returns all unique tags that include the word given as the argument.
-		Drop the duplicates. It is a list of the tags. Sort it by tag names alphabetically.
-		"""
-		word = str(word).lower()
-		tags_with = set()
-		for tags in self.read_csv():
-			tag_list = tags['tag']
-			if self.contains_tag(str(tag_list), word):
-				tags_with.add(str(tag_list))
-		return sorted(tags_with)
-
-	@staticmethod
-	def get_tags(tags: dict):
-		return tags['tag'].split(' ')
-
-	@staticmethod
-	def contains_tag(tag_list, word):
-		for tag in tag_list.split(" "):
-			if tag == word:
-				return True
-		return False
+class Tags:
+    """
+    Analyzing data from tags.csv
+    """
+    first_line_list = ["userId","movieId","tag","timestamp"]
+    def __init__(self, path_to_the_file):
+        """
+        Put here any fields that you think you will need.
+        """
+        f = open(path_to_the_file, "r")
+        self.userId = list()
+        self.movieId = list()
+        self.tag = list()
+        self.timestamp = list()
+        first_line = True
+        elem_count = len(self.first_line_list)
+        for line in f:
+            if first_line:
+                word_list = line[0:-1].split(",")
+                if word_list != self.first_line_list:
+                    raise Exception("Wrong file")
+                first_line = False
+            else:
+                word_list = line.split(",")
+                if len(word_list) != elem_count:
+                    raise Exception(f"Wrong file:\n Line \'{line}\' should have {elem_count} elements")
+                self.userId.append(word_list[0])
+                self.movieId.append(word_list[1])
+                self.tag.append(word_list[2])
+                self.timestamp.append(word_list[3])
+        f.close()
 
 
-class Links(CsvParser):
-	"""
-	Analyzing data from links.csv
-	"""
+    def most_words(self, n):
+        """
+        The method returns top-n tags with most words inside. It is a dict 
+ where the keys are tags and the values are the number of words inside the tag.
+ Drop the duplicates. Sort it by numbers descendingly.
+        """
+        if n < 1:
+            n = -1
+        big_tags = set(map(lambda x: (x,len(x.split(" "))), self.tag))
+        big_tags = list(big_tags)
+        big_tags.sort(key=lambda i: i[1], reverse=True)
+        big_tags = dict(big_tags[0:n])
+        return big_tags
 
-	def __init__(self, path_to_the_file):
-		self.data = []
-		super().__init__(path_to_the_file)
-		self.data = list(super().read_csv())
-		self.global_dict = {}
+    def longest(self, n):
+        """
+        The method returns top-n longest tags in terms of the number of characters.
+        It is a list of the tags. Drop the duplicates. Sort it by numbers descendingly.
+        """
+        if n < 1:
+            n = -1
+        big_tags = set(map(lambda x: (x,len(x)), self.tag))
+        big_tags = list(big_tags)
+        big_tags.sort(key=lambda i: i[1], reverse=True)
+        big_tags = list(map(lambda x: x[0], big_tags[0:n]))
+        return big_tags
 
-	def get_imdb(self, list_of_movies, list_of_fields):
-		"""
-		The method returns a list of lists [movieId, field1, field2, field3, ...]
-			for the list of movies given as the argument (movieId).
-		For example, [movieId, Director, Budget, Cumulative Worldwide Gross, Runtime].
-		The values should be parsed from the IMDB webpages of the movies.
-		Sort it by movieId descendingly.
-		"""
-		result = []
+    def most_words_and_longest(self, n):
+        """
+        The method returns the intersection between top-n tags with most words inside and 
+        top-n longest tags in terms of the number of characters.
+        Drop the duplicates. It is a list of the tags.
+        """
+        most_words_list = self.most_words(n)
+        tags_key = most_words_list.keys()
+        longest_list = self.longest(n)
+        big_tags = list(set(tags_key).intersection(set(longest_list)))
+        return big_tags
+        
+    def most_popular(self, n):
+        """
+        The method returns the most popular tags. 
+        It is a dict where the keys are tags and the values are the counts.
+        Drop the duplicates. Sort it by counts descendingly.
+        """
+        if n < 1:
+            n = -1
+        popular_tags = list(set(Counter(self.tag).items()))
+        popular_tags.sort(key=lambda i: i[1], reverse=True)
+        popular_tags = dict(popular_tags[0:n])
+        return popular_tags
+        
+    def tags_with(self, word):
+        """
+        The method returns all unique tags that include the word given as the argument.
+        Drop the duplicates. It is a list of the tags. Sort it by tag names alphabetically.
+        """
+        unique_tags = set(self.tag)
+        tags_with_word = list(filter(lambda x: x.find(word) >= 0, unique_tags))
+        tags_with_word.sort()
+        return tags_with_word
 
-		def parse_movie(imdbId):
+class Links:
+    """
+    Analyzing data from links.csv
+    """
+    first_line_list = ["movieId","imdbId","tmdbId"]
+    limit_films = 5
+    def __init__(self, path_to_the_file):
+        """
+        Put here any fields that you think you will need.
+        """
+        f = open(path_to_the_file, "r")
+        self.movieId = list()
+        self.imdbId = list()
+        self.tmdbId = list()
+        first_line = True
+        elem_count = len(self.first_line_list)
+        for line in f:
+            if first_line:
+                word_list = line[0:-1].split(",")
+                if word_list != self.first_line_list:
+                    raise Exception("Wrong file")
+                first_line = False
+            else:
+                word_list = line[0:-1].split(",")
+                if len(word_list) != elem_count:
+                    raise Exception(f"Wrong file:\n Line \'{line}\' should have {elem_count} elements")
+                self.movieId.append(word_list[0])
+                self.imdbId.append(word_list[1])
+                self.tmdbId.append(word_list[2])
+        f.close()
+    
+    def get_imdb(self, list_of_movies, list_of_fields):
+        """
+        The method returns a list of lists [movieId, field1, field2, field3, ...] for the list of movies given as the argument (movieId).
+        For example, [movieId, Director, Budget, Cumulative Worldwide Gross, Runtime].
+        The values should be parsed from the IMDB webpages of the movies.
+        Sort it by movieId descendingly.
+        """
+        imdb_info = list()
+        for movie in list_of_movies:
+            tmp_dict = dict()
+            if movie in self.movieId:
+                tmp_dict["movieId"] = movie
+                imdbId = self.imdbId[self.movieId.index(movie)]
+                url = "http://www.imdb.com/title/tt" + imdbId + "/"
+                response = requests.get(url).text
+                soup = BeautifulSoup(response, 'html.parser')
 
-			def get_info(soap_tag):
-				info = str(soap_tag)
-				i = 0
-				l = len(info)
-				while i < l and info[i] != '>':
-					i += 1
-				start = i + 1
-				while i < l and info[i] != '<':
-					i += 1
-				return (info[start:i] if i < l else info).strip()
+                blocks = soup.find_all('li', class_="ipc-metadata-list__item")
+                for block in blocks:
+                    if block.text.find('Director') >= 0 and "Director" in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Director'] = group
+                    elif block.text.find('Writers') >= 0 and "Writers" in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Writers'] = group
+                    elif block.text.find('Stars') >= 0 and "Stars" in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Stars']= group
+                    elif block.text.find('Runtime') >= 0 and "Runtime" in list_of_fields:
+                        group = [group.text for group in block.find_all('div')]
+                        tmp_dict['Runtime']= group
+                    elif block.text.find('Production companies') >= 0 and 'Production companies' in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Production companies']= group
+                    elif block.text.find('Budget') >= 0 and 'Budget' in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Budget']= group
+                    elif block.text.find('Gross worldwide') >= 0 and 'Gross worldwide' in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Gross worldwide']= group
+                    elif block.text.find('Gross worldwide') >= 0 and 'Cumulative Worldwide Gross' in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Cumulative Worldwide Gross']= group
+                    elif block.text.find('Genres') >= 0 and 'Genres' in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Genres']= group
+                    elif block.text.find('Also known as') >= 0 and 'Titles' in list_of_fields:
+                        group = [group.text for group in block.find_all('li')]
+                        tmp_dict['Titles']= group
+                
+                tmp_list = list()
+                for i in list_of_fields:
+                    if i in tmp_dict.keys():
+                        tmp_list.append(tmp_dict[i])
+                    else:
+                        tmp_list.append([" -1"])
+                imdb_info.append([movie, tmp_list])
 
-			link = f'https://www.imdb.com/title/tt{imdbId}/'
-			raw_0 = requests.get(link).text
+        imdb_info.sort(key=lambda i: int(i[0]), reverse=True)
+        imdb_info = list(map(lambda x: x[1], imdb_info))
+        return imdb_info
 
-			content = bs(raw_0, features="html.parser")
-			raw_1 = content.find(
-				'script', attrs={'type': "application/ld+json"})
+    def top_directors(self, n):
+        """
+        The method returns a dict with top-n directors where the keys are directors and 
+        the values are numbers of movies created by them. Sort it by numbers descendingly.
+        """
+        movie_id_list = self.get_movie_selection_id(n)
+        directors = dict()
+        info = self.get_imdb(movie_id_list, ["Director"])
+        for direct_list in info:
+            for direct in direct_list[0]:
+                if direct in directors.keys():
+                    directors[direct] += 1
+                else:
+                    directors[direct] = 1
+        directors = list(directors.items())
+        directors.sort(key=lambda i: i[1], reverse=True)
 
-			dict_info = json.loads(raw_1.contents[0])
-			raw_2 = content.find_all('div', attrs={'class': "txt-block"})
-			for e in raw_2:
-				pair = [el for el in e.contents if el != '\n'][:2]
-				dict_info[get_info(pair[0])] = get_info(pair[1])
-			return dict_info
-
-		list_of_movies = sorted(list_of_movies, reverse=True)
-		for movie in list_of_movies:
-			imdb = None
-			for row in self.data:
-				movie_id = row['movieId']
-				imdb_id = row['imdbId']
-				if movie == movie_id:
-					imdb = imdb_id
-			if imdb is None:
-				print(f'Incorrect movie_id: {movie}')
-				sys.exit()
-			dict_info = parse_movie(imdb)
-			dict_v = {movie: ""}
-
-			for field in list_of_fields:
-				field_to_lower = field
-				try:
-					self.global_dict[movie] = {"director": dict_info["director"]["name"], "title": dict_info["name"]}
-				except KeyError:
-					sys.exit()
-				if field_to_lower in dict_info.keys():
-					by_key = dict_info[field_to_lower]
-					try:
-						if isinstance(by_key, list):
-							for key in by_key:
-								if "name" in key:
-									dict_v[key["name"]] = ""
-						elif isinstance(by_key, dict):
-							dict_v[dict_info[field_to_lower]["name"]] = ""
-						else:
-							dict_v[by_key] = ""
-					except KeyError:
-						print("Key error on filed " + field_to_lower)
-						sys.exit()
-			result.append(list(dict_v.keys()))
-		return result
-
-	def top_directors(self, n):
-		"""
-		The method returns a dict with top-n directors where the keys are directors and
-		the values are numberы of movies created by them. Sort it by numbers descendingly.
-		"""
-		top_directors = Counter()
-		for k, v in self.global_dict.items():
-			top_directors[v["director"]] += 1
-		return top_directors.most_common(n)
-
-	def most_expensive(self, n):
-		"""
-		The method returns a dict with top-n movies where the keys are movie titles and
-		the values are their budgets. Sort it by budgets descendingly.
-		"""
-		pass
-
-	def most_profitable(self, n):
-		"""
-		The method returns a dict with top-n movies where the keys are movie titles and
-		the values are the difference between cumulative worldwide gross and budget.
-		Sort it by the difference descendingly.
-		"""
-		pass
-
-	def longest(self, n):
-		"""
-		The method returns a dict with top-n movies where the keys are movie titles and
-		the values are their runtime. If there are more than one version – choose any.
-		Sort it by runtime descendingly.
-		"""
-		pass
-
-	def top_cost_per_minute(self, n):
-		"""
-		The method returns a dict with top-n movies where the keys are movie titles
-		and the values are the budgets divided by their runtime.
-		The budgets can be in different currencies – do not pay attention to it.
-		The values should be rounded to 2 decimals. Sort it by the division descendingly.
-		"""
-		pass
+        return dict(directors[0:n])
+        
+    def most_expensive(self, n):
+        """
+        The method returns a dict with top-n movies where the keys are movie titles and
+        the values are their budgets. Sort it by budgets descendingly.
+        """
+        movie_id_list = self.get_movie_selection_id(n)
+        budgets = dict()
+        info = self.get_imdb(movie_id_list, ["Titles", 'Budget'])
+        for budget_list in info:
+            budgets[budget_list[0][0]] = budget_list[1][0]
+        budgets = list(budgets.items())
+        budgets.sort(key=lambda i: i[1], reverse=True)
+        return dict(budgets[0:n])
+        
+    def most_profitable(self, n):
+        """
+        The method returns a dict with top-n movies where the keys are movie titles and
+        the values are the difference between cumulative worldwide gross and budget.
+        Sort it by the difference descendingly.
+        """
+        movie_id_list = self.get_movie_selection_id(n)
+        profits = dict()
+        info = self.get_imdb(movie_id_list, ["Titles", 'Cumulative Worldwide Gross', 'Budget'])
+        for profit_list in info:
+            profits[profit_list[0][0]] = float(profit_list[1][0][1::].split(" ")[0].replace(",", "")) - float(profit_list[2][0][1::].split(" ")[0].replace(",", ""))
+        profits = list(profits.items())
+        profits.sort(key=lambda i: i[1], reverse=True)
+        return dict(profits[0:n])
+        
+    def longest(self, n):
+        """
+        The method returns a dict with top-n movies where the keys are movie titles and
+        the values are their runtime. If there are more than one version – choose any.
+        Sort it by runtime descendingly.
+        """
+        movie_id_list = self.get_movie_selection_id(n)
+        runtimes = dict()
+        info = self.get_imdb(movie_id_list, ["Titles", 'Runtime'])
+        for runtime_list in info:
+            runtimes[runtime_list[0][0]] = runtime_list[1][0]
+        runtimes = list(runtimes.items())
+        runtimes.sort(key=lambda i: i[1], reverse=True)
+        return dict(runtimes[0:n])
+        
+    def top_cost_per_minute(self, n):
+        """
+        The method returns a dict with top-n movies where the keys are movie titles and
+        the values are the budgets divided by their runtime. The budgets can be in different currencies – do not pay attention to it. 
+        The values should be rounded to 2 decimals. Sort it by the division descendingly.
+        """
+        movie_id_list = self.get_movie_selection_id(n)
+        costs = dict()
+        info = self.get_imdb(movie_id_list, ["Titles", 'Budget', 'Runtime'])
+        for cost_list in info:
+            time = cost_list[2][0]
+            if time.find('hour') >= 0:
+                time_min = float(time[0: time.find('hour')]) * 60
+                if time.find('min') >= 0:
+                    time_min += float(time[time.find('hour') + 5::].lstrip().split(" ")[0])
+            else:
+                time_min = float(time)
+            costs[cost_list[0][0]] = float(cost_list[1][0][1::].split(" ")[0].replace(",", "")) / time_min
+        costs = list(costs.items())
+        costs.sort(key=lambda i: i[1], reverse=True)
+        return dict(costs[0:n])
+    
+    def get_movie_selection_id(self, n:int):
+        if n < 1:
+            n = len(self.movieId)
+        tmp_set = set(self.movieId)
+        movie_id = list()
+        for i in range(0, n):
+            movie_id.append(tmp_set.pop())
+        return movie_id
 
 
 class Tests:
@@ -621,19 +685,88 @@ class Tests:
 		assert (isinstance(result, list) and
 			set(map(type, result)) == {str} and
 			sorted(result, reverse=False) == list(result))
+	
+	def test_tags_most_words(self):
+		top_n = self.tags.most_words(10)
+		assert isinstance(top_n, dict)
+		assert len(top_n) == 10
+		longes_key = "Something for everyone in this one... saw it without and plan on seeing it with kids!"
+		assert top_n[longes_key] == 16
+
+	def test_tags_longest(self):
+		top_n = self.tags.longest(10)
+		assert isinstance(top_n, list)
+		assert isinstance(top_n[0], str)
+		assert len(top_n) == 10
+		longes_key = "Something for everyone in this one... saw it without and plan on seeing it with kids!"
+		assert len(top_n[0]) == 85 and top_n[0] == longes_key
+
+	def test_tags_most_words_and_longest(self):
+		top_n = self.tags.most_words_and_longest(10)
+		assert isinstance(top_n, list)
+		assert isinstance(top_n[0], str)
+		assert len(top_n) <= 10
+		longes_key = "Something for everyone in this one... saw it without and plan on seeing it with kids!"
+		assert longes_key in top_n
+
+	def test_tags_most_popular(self):
+		top_n = self.tags.most_popular(10)
+		assert isinstance(top_n, dict)
+		assert len(top_n) == 10
+		popular_key = "In Netflix queue"
+		assert top_n[popular_key] == 131
+
+	def test_tags_with_word(self):
+		top_n = self.tags.tags_with("ab")
+		assert isinstance(top_n, list)
+		assert isinstance(top_n[0], str)
+		assert len(top_n) == 26
+		assert top_n[0].find("ab") >= 0
 
 	def test_get_imdb(self):
-		result = self.links.get_imdb(['1', '2', '3', '4', '5'], ['director', 'name', 'genre', 'actor'])
+		result = self.links.get_imdb(['1', '2', '3', '4', '5'], ['movieId', 'Director', 'Genre', 'Stars'])
 		assert (isinstance(result, list) and
 			set(map(type, result)) == {list} and
 			sorted(result, reverse=True, key=lambda x: x[0]) == list(result))
 
 	def test_top_directors(self):
-		self.links.get_imdb(['1', '2', '3', '4', '5'], ['director', 'name', 'genre', 'actor'])
+		self.links.get_imdb(['1', '2', '3', '4', '5'], ['movieId', 'Director', 'Genre', 'Stars'])
 		result = self.links.top_directors(3)
 		assert (isinstance(result, list) and
 			set(map(type, result)) == {tuple} and
 			sorted(result, reverse=True, key=lambda x: x[1]) == list(result))
+
+	def test_links_get_imdb(self):
+		info_list = self.links.get_imdb(["1", "2"], ["movieId"])
+		assert isinstance(info_list, list)
+		assert isinstance(info_list[0], list)
+		assert int(info_list[0][0]) > int(info_list[1][0])
+
+	def test_links_top_directors(self):
+		top_n = self.links.top_directors(3)
+		assert isinstance(top_n, dict)
+
+	def test_links_most_expensive(self):
+		top_n = self.links.most_expensive(3)
+		assert isinstance(top_n, dict)
+
+	def test_links_most_profitable(self):
+		top_n = self.links.most_profitable(3)
+		assert isinstance(top_n, dict)
+
+	def test_links_longest(self):
+		top_n = self.links.longest(3)
+		assert isinstance(top_n, dict)
+
+	def test_links_top_cost_per_minute(self):
+		top_n = self.links.top_cost_per_minute(3)
+		assert isinstance(top_n, dict)
+
+	def test_links_get_movie_selection_id(self):
+		top_n = self.links.get_movie_selection_id(3)
+		assert isinstance(top_n, list)
+		assert isinstance(top_n[0], str)
+		assert len(top_n) == 3
 
 if __name__ == '__main__':
 	#print(CsvParser(sys.argv[1]).open_csv())
@@ -642,4 +775,4 @@ if __name__ == '__main__':
 	#print(Tests().test_rating_dist_by_year)
 	#print(Tags('ml-latest-small/tags.csv').is_valid_file())
 	#print(CsvParser(sys.argv[1]).read_csv())
-	#print(Links('ml-latest-small/links.csv').get_imdb(['1', '2', '3', '4', '5'], ['director', 'name', 'genre', 'actor', 'runtime']))
+	#print(Links('ml-latest-small/links.csv').get_imdb(['1', '2', '3', '4', '5'], ['movieId', 'Director', 'Genre', 'Stars']))
