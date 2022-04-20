@@ -337,7 +337,7 @@ class Tags:
 
     def most_words(self, n):
         """
-        The method returns top-n tags with most words inside. It is a dict 
+        The method returns top-n tags with most words inside. It is a dict
  where the keys are tags and the values are the number of words inside the tag.
  Drop the duplicates. Sort it by numbers descendingly.
         """
@@ -364,7 +364,7 @@ class Tags:
 
     def most_words_and_longest(self, n):
         """
-        The method returns the intersection between top-n tags with most words inside and 
+        The method returns the intersection between top-n tags with most words inside and
         top-n longest tags in terms of the number of characters.
         Drop the duplicates. It is a list of the tags.
         """
@@ -373,10 +373,10 @@ class Tags:
         longest_list = self.longest(n)
         big_tags = list(set(tags_key).intersection(set(longest_list)))
         return big_tags
-        
+
     def most_popular(self, n):
         """
-        The method returns the most popular tags. 
+        The method returns the most popular tags.
         It is a dict where the keys are tags and the values are the counts.
         Drop the duplicates. Sort it by counts descendingly.
         """
@@ -386,7 +386,7 @@ class Tags:
         popular_tags.sort(key=lambda i: i[1], reverse=True)
         popular_tags = dict(popular_tags[0:n])
         return popular_tags
-        
+
     def tags_with(self, word):
         """
         The method returns all unique tags that include the word given as the argument.
@@ -427,7 +427,7 @@ class Links:
                 self.imdbId.append(word_list[1])
                 self.tmdbId.append(word_list[2])
         f.close()
-    
+
     def get_imdb(self, list_of_movies, list_of_fields):
         """
         The method returns a list of lists [movieId, field1, field2, field3, ...] for the list of movies given as the argument (movieId).
@@ -443,7 +443,7 @@ class Links:
                 imdbId = self.imdbId[self.movieId.index(movie)]
                 url = "http://www.imdb.com/title/tt" + imdbId + "/"
                 response = requests.get(url).text
-                soup = BeautifulSoup(response, 'html.parser')
+                soup = bs(response, 'html.parser')
 
                 blocks = soup.find_all('li', class_="ipc-metadata-list__item")
                 for block in blocks:
@@ -464,7 +464,9 @@ class Links:
                         tmp_dict['Production companies']= group
                     elif block.text.find('Budget') >= 0 and 'Budget' in list_of_fields:
                         group = [group.text for group in block.find_all('li')]
-                        tmp_dict['Budget']= group
+                        for budget in group:
+                            budget_int = int(''.join([c for c in budget.replace(',', '') if c.isdigit()]))
+                        tmp_dict['Budget']= [budget_int]
                     elif block.text.find('Gross worldwide') >= 0 and 'Gross worldwide' in list_of_fields:
                         group = [group.text for group in block.find_all('li')]
                         tmp_dict['Gross worldwide']= group
@@ -477,7 +479,7 @@ class Links:
                     elif block.text.find('Also known as') >= 0 and 'Titles' in list_of_fields:
                         group = [group.text for group in block.find_all('li')]
                         tmp_dict['Titles']= group
-                
+
                 tmp_list = list()
                 for i in list_of_fields:
                     if i in tmp_dict.keys():
@@ -492,7 +494,7 @@ class Links:
 
     def top_directors(self, n):
         """
-        The method returns a dict with top-n directors where the keys are directors and 
+        The method returns a dict with top-n directors where the keys are directors and
         the values are numbers of movies created by them. Sort it by numbers descendingly.
         """
         movie_id_list = self.get_movie_selection_id(n)
@@ -508,7 +510,7 @@ class Links:
         directors.sort(key=lambda i: i[1], reverse=True)
 
         return dict(directors[0:n])
-        
+
     def most_expensive(self, n):
         """
         The method returns a dict with top-n movies where the keys are movie titles and
@@ -520,9 +522,16 @@ class Links:
         for budget_list in info:
             budgets[budget_list[0][0]] = budget_list[1][0]
         budgets = list(budgets.items())
-        budgets.sort(key=lambda i: i[1], reverse=True)
-        return dict(budgets[0:n])
-        
+        budgets_sort = budgets.copy()
+        for i, (movies_name, budget) in enumerate(budgets_sort):
+            if budget == ' -1':
+                budget_int = -1
+            else:
+                budget_int = budget
+            budgets_sort[i] = (movies_name, budget_int)
+        budgets_sort.sort(key=lambda i: i[1], reverse=True)
+        return dict(budgets_sort[0:n])
+
     def most_profitable(self, n):
         """
         The method returns a dict with top-n movies where the keys are movie titles and
@@ -537,7 +546,7 @@ class Links:
         profits = list(profits.items())
         profits.sort(key=lambda i: i[1], reverse=True)
         return dict(profits[0:n])
-        
+
     def longest(self, n):
         """
         The method returns a dict with top-n movies where the keys are movie titles and
@@ -552,11 +561,11 @@ class Links:
         runtimes = list(runtimes.items())
         runtimes.sort(key=lambda i: i[1], reverse=True)
         return dict(runtimes[0:n])
-        
+
     def top_cost_per_minute(self, n):
         """
         The method returns a dict with top-n movies where the keys are movie titles and
-        the values are the budgets divided by their runtime. The budgets can be in different currencies – do not pay attention to it. 
+        the values are the budgets divided by their runtime. The budgets can be in different currencies – do not pay attention to it.
         The values should be rounded to 2 decimals. Sort it by the division descendingly.
         """
         movie_id_list = self.get_movie_selection_id(n)
@@ -569,12 +578,16 @@ class Links:
                 if time.find('min') >= 0:
                     time_min += float(time[time.find('hour') + 5::].lstrip().split(" ")[0])
             else:
-                time_min = float(time)
-            costs[cost_list[0][0]] = float(cost_list[1][0][1::].split(" ")[0].replace(",", "")) / time_min
+                print(time.split(' ')[0])
+                time_min = float(time.split(' ')[0])
+            budget = cost_list[1][0]
+            if not isinstance(budget, int):
+                budget = -1
+            costs[cost_list[0][0]] = budget / time_min
         costs = list(costs.items())
         costs.sort(key=lambda i: i[1], reverse=True)
         return dict(costs[0:n])
-    
+
     def get_movie_selection_id(self, n:int):
         if n < 1:
             n = len(self.movieId)
@@ -685,7 +698,7 @@ class Tests:
 		assert (isinstance(result, list) and
 			set(map(type, result)) == {str} and
 			sorted(result, reverse=False) == list(result))
-	
+
 	def test_tags_most_words(self):
 		top_n = self.tags.most_words(10)
 		assert isinstance(top_n, dict)
@@ -732,9 +745,8 @@ class Tests:
 	def test_top_directors(self):
 		self.links.get_imdb(['1', '2', '3', '4', '5'], ['movieId', 'Director', 'Genre', 'Stars'])
 		result = self.links.top_directors(3)
-		assert (isinstance(result, list) and
-			set(map(type, result)) == {tuple} and
-			sorted(result, reverse=True, key=lambda x: x[1]) == list(result))
+		assert (isinstance(result, dict) and
+			set(map(type, result)) == {str})
 
 	def test_links_get_imdb(self):
 		info_list = self.links.get_imdb(["1", "2"], ["movieId"])
@@ -775,4 +787,4 @@ if __name__ == '__main__':
 	#print(Tests().test_rating_dist_by_year)
 	#print(Tags('ml-latest-small/tags.csv').is_valid_file())
 	#print(CsvParser(sys.argv[1]).read_csv())
-	#print(Links('ml-latest-small/links.csv').get_imdb(['1', '2', '3', '4', '5'], ['movieId', 'Director', 'Genre', 'Stars']))
+	print(Links('links.csv').top_cost_per_minute(5))
