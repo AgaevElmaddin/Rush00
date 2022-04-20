@@ -472,7 +472,9 @@ class Links:
                         tmp_dict['Gross worldwide']= group
                     elif block.text.find('Gross worldwide') >= 0 and 'Cumulative Worldwide Gross' in list_of_fields:
                         group = [group.text for group in block.find_all('li')]
-                        tmp_dict['Cumulative Worldwide Gross']= group
+                        for gross in group:
+                            gross_int = int(''.join([c for c in gross.replace(',', '') if c.isdigit()]))
+                        tmp_dict['Cumulative Worldwide Gross']= [gross_int]
                     elif block.text.find('Genres') >= 0 and 'Genres' in list_of_fields:
                         group = [group.text for group in block.find_all('li')]
                         tmp_dict['Genres']= group
@@ -542,7 +544,7 @@ class Links:
         profits = dict()
         info = self.get_imdb(movie_id_list, ["Titles", 'Cumulative Worldwide Gross', 'Budget'])
         for profit_list in info:
-            profits[profit_list[0][0]] = float(profit_list[1][0][1::].split(" ")[0].replace(",", "")) - float(profit_list[2][0][1::].split(" ")[0].replace(",", ""))
+            profits[profit_list[0][0]] = float(profit_list[1][0]) - float(profit_list[2][0])
         profits = list(profits.items())
         profits.sort(key=lambda i: i[1], reverse=True)
         return dict(profits[0:n])
@@ -787,4 +789,4 @@ if __name__ == '__main__':
 	#print(Tests().test_rating_dist_by_year)
 	#print(Tags('ml-latest-small/tags.csv').is_valid_file())
 	#print(CsvParser(sys.argv[1]).read_csv())
-	print(Links('links.csv').top_cost_per_minute(5))
+	print(Links('links.csv').most_profitable(500))
